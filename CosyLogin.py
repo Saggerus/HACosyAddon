@@ -22,7 +22,7 @@ def login_to_cosy(username, password):
         return data["token"]
     except requests.exceptions.RequestException as e:
         print(f"Error during login: {e}")
-        return None
+        return response.status_code
 
 def get_current_temperature(token,systemID):
     data_url = base_url + "system/cosy-live-data/"+systemID
@@ -35,12 +35,12 @@ def get_current_temperature(token,systemID):
         return temperature
     except requests.exceptions.RequestException as e:
         print(f"Error retrieving temperature: {e}")
-        return None
+        return temperature
     
 def set_heating_mode(auth_token, systemID, mode, duration):
     print(mode)
     if mode == "1":
-        print("got this far")
+        
         set_mode_url = base_url + "system/cosy-cancelallevents/" + systemID + "?zone=0"
         headers = {
         "Authorization": f"Bearer {auth_token}",
@@ -81,6 +81,8 @@ def set_heating_mode(auth_token, systemID, mode, duration):
         
         else:
             print(f"Failed to set heating mode: {response.status_code} - {response.text}")
+    
+    return response.status_code
 
 def set_hibernate(auth_token, systemID, value):
     set_mode_url = base_url + "system/cosy-instandby/" + systemID
@@ -102,6 +104,7 @@ def set_hibernate(auth_token, systemID, value):
         
     else:
         print(f"Failed to set heating mode: {response.status_code} - {response.text}")
+    return response.status_code
 
 def getAllSettings(auth_token, systemID):
     
@@ -116,7 +119,8 @@ def getAllSettings(auth_token, systemID):
         return data
     except requests.exceptions.RequestException as e:
         print(f"Error retrieving settings: {e}")
-        return None
+        
+    return data
 
 def getSystemId(auth_token):
     data_url = base_url + "user/detail-systems?peripherals=true"
@@ -137,7 +141,7 @@ def getSystemId(auth_token):
     else:
         print(f"Failed to get system ID: {response.status_code} - {response.text}")
 
-        return None
+        return response.status_code
     
 def setModeTemp(auth_token,SystemId,mode,temp):
         # Set the temp of the passed mode.  
@@ -158,13 +162,21 @@ def setModeTemp(auth_token,SystemId,mode,temp):
         response = requests.post(requestUrl, json=payload, headers=headers)
 
         if response.status_code == 200:
-            print(mode "temperature set to " + temp + " degrees!" )
+            print(mode + " temperature set to " + str(temp) + " degrees!" )
            
         else:
             print(f"Failed to set temperature: {response.status_code} - {response.text}")
 
 
-        return None
+        return response.status_code
+
+def getTempPoints(auth_token, systemId):
+    currentData = getAllSettings(auth_token,systemId)
+    tempPoints = currentData["temperatureSetPoints"]
+    print(tempPoints)
+    return tempPoints
+
+
     
 
 def main():
@@ -178,6 +190,7 @@ def main():
     parser.add_argument('--duration', type=int, help="Duration for the mode in minutes.")
     parser.add_argument('--modetemp', type=str, choices=['slumber', 'comfy', 'cosy'], required=False, help="The mode to set temperature for (slumber, comfy or cosy). Must be accompanied by --value")
     parser.add_argument('--value', type=float, help="Temperature to set the specified mode to eg. 20.5")
+    parser.add_argument('--temppoints', action='store_true', help="Get the current temperature points for each mode.")
     args = parser.parse_args()
 
 
@@ -225,10 +238,16 @@ def main():
         set_hibernate(token,sysID,hibState) 
     
     #doHibernate = set_hibernate(token,"true")
-    print(sysID)
+    
+    if args.modetemp and args.value is None:
+        parser.error("--value is required when --modetemp is specified.")
+    elif args.modetemp is None and args.value:
+        parser.error("--modetemp must be specified when --value is provided.")
     if args.modetemp is not None:
         setModeTemp(token,sysID,"cosy",args.value)
     
-
+    if args.temppoints:
+        getTempPoints(token, sysID)   
+        
 if __name__ == "__main__":
     main()
